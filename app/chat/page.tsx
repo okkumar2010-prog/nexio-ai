@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, MouseEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
@@ -13,85 +13,63 @@ type Message = {
   content: string;
 };
 
-type Conversation = {
-  id: number;
+interface Conversation {
+  id: string;
   title: string;
+  createdAt: string;
   messages: Message[];
-};
+}
 
-const STORAGE_KEY = "nexio-chat-history";
-const starterAssistantMessage: Message = {
-  id: 1,
-  role: "assistant",
-  content:
-    "Hello, I’m Nexio AI. I can help with studying, coding, business, creativity, and problem solving. What would you like to work on?",
-};
+const starterMessages: Message[] = [
+  {
+    id: 1,
+    role: "assistant",
+    content:
+      "Hello, I’m Nexio AI. I can help with studying, coding, business, creativity, and problem solving. What would you like to work on?",
+  },
+];
 
-function createStarterConversation(id = Date.now()): Conversation {
+const STORAGE_KEY = "nexio-ai-conversations";
+
+function createMessage(content: string, role: Message["role"]): Message {
   return {
-    id,
-    title: "New Chat",
-    messages: [starterAssistantMessage],
+    id: Date.now() + Math.floor(Math.random() * 1000),
+    role,
+    content,
   };
 }
 
-function buildConversationTitle(message: string) {
-  const cleaned = message.replace(/\s+/g, " ").trim();
-  if (!cleaned) {
-    return "New Chat";
-  }
+function createConversation(title = "New Chat", messages: Message[] = []): Conversation {
+  return {
+    id: `chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    title,
+    createdAt: new Date().toISOString(),
+    messages,
+  };
+}
 
-  return cleaned.length > 36 ? `${cleaned.slice(0, 33)}...` : cleaned;
+function createTitleFromMessage(content: string) {
+  const words = content.trim().split(/\s+/).filter(Boolean);
+  const titleWords = words.slice(0, 6);
+  return titleWords.join(" ").trim() || "New Chat";
 }
 
 export default function ChatPage() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [activeConversationId, setActiveConversationId] = useState<number | null>(null);
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  const [isHydrated, setIsHydrated] = useState(false);
   const [draft, setDraft] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [copiedMessageId, setCopiedMessageId] = useState<number | null>(null);
-  const [isHydrated, setIsHydrated] = useState(false);
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
-  const activeConversation = conversations.find((conversation) => conversation.id === activeConversationId) ?? conversations[0] ?? null;
+  const activeConversation = useMemo(
+    () => conversations.find((conversation) => conversation.id === activeConversationId) ?? conversations[0] ?? null,
+    [activeConversationId, conversations]
+  );
+
   const messages = activeConversation?.messages ?? [];
-
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    try {
-      const stored = window.localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored) as {
-          conversations?: Conversation[];
-          activeConversationId?: number;
-        };
-
-        if (Array.isArray(parsed.conversations) && parsed.conversations.length > 0) {
-          const restored = parsed.conversations;
-          setConversations(restored);
-          setActiveConversationId(parsed.activeConversationId ?? restored[0].id);
-        } else {
-          const fallback = createStarterConversation();
-          setConversations([fallback]);
-          setActiveConversationId(fallback.id);
-        }
-      } else {
-        const fallback = createStarterConversation();
-        setConversations([fallback]);
-        setActiveConversationId(fallback.id);
-      }
-    } catch {
-      const fallback = createStarterConversation();
-      setConversations([fallback]);
-      setActiveConversationId(fallback.id);
-    } finally {
-      setIsHydrated(true);
-    }
-  }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -106,80 +84,123 @@ export default function ChatPage() {
   }, [copiedMessageId]);
 
   useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    try {
+      const storedConversations = window.localStorage.getItem(STORAGE_KEY);
+
+      if (storedConversations) {
+        const parsed = JSON.parse(storedConversations) as Conversation[];
+        const normalized = Array.isArray(parsed)
+          ? parsed
+              .filter((conversation): conversation is Conversation => Boolean(conversation && typeof conversation === "object"))
+              .map((conversation) => ({
+                id: typeof conversation.id === "string" ? conversation.id : `chat-${Date.now()}`,
+                title: typeof conversation.title === "string" && conversation.title.trim() ? conversation.title : "New Chat",
+                createdAt: typeof conversation.createdAt === "string" ? conversation.createdAt : new Date().toISOString(),
+                messages: Array.isArray(conversation.messages)
+                  ? conversation.messages.filter(
+                      (message): message is Message =>
+                        Boolean(message) &&
+                        typeof message === "object" &&
+                        typeof message.content === "string" &&
+                        (message.role === "user" || message.role === "assistant")
+                    )
+                  : [],
+              }))
+          : [];
+
+        if (normalized.length > 0) {
+          setConversations(normalized);
+          setActiveConversationId(normalized[0].id);
+        } else {
+          const fallbackConversation = createConversation("New Chat", starterMessages);
+          setConversations([fallbackConversation]);
+          setActiveConversationId(fallbackConversation.id);
+        }
+      } else {
+        const fallbackConversation = createConversation("New Chat", starterMessages);
+        setConversations([fallbackConversation]);
+        setActiveConversationId(fallbackConversation.id);
+      }
+    } catch {
+      const fallbackConversation = createConversation("New Chat", starterMessages);
+      setConversations([fallbackConversation]);
+      setActiveConversationId(fallbackConversation.id);
+    } finally {
+      setIsHydrated(true);
+    }
+  }, []);
+
+  useEffect(() => {
     if (!isHydrated || typeof window === "undefined") {
       return;
     }
 
-    window.localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({
-        conversations,
-        activeConversationId,
-      })
-    );
-  }, [conversations, activeConversationId, isHydrated]);
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations));
+  }, [conversations, isHydrated]);
 
-  function handleNewChat() {
-    const nextConversation = createStarterConversation(Date.now());
+  function createNewChat() {
+    const nextConversation = createConversation("New Chat", []);
     setConversations((current) => [nextConversation, ...current]);
     setActiveConversationId(nextConversation.id);
     setDraft("");
     setError("");
   }
 
-  function handleSelectConversation(id: number) {
-    setActiveConversationId(id);
-    setDraft("");
-    setError("");
-  }
+  function deleteConversation(conversationId: string) {
+    setConversations((current) => {
+      const nextConversations = current.filter((conversation) => conversation.id !== conversationId);
 
-  function handleDeleteConversation(id: number, event: MouseEvent<HTMLButtonElement>) {
-    event.preventDefault();
-    event.stopPropagation();
+      if (nextConversations.length === 0) {
+        const fallbackConversation = createConversation("New Chat", []);
+        setActiveConversationId(fallbackConversation.id);
+        return [fallbackConversation];
+      }
 
-    const remaining = conversations.filter((conversation) => conversation.id !== id);
-    if (remaining.length === 0) {
-      const fallback = createStarterConversation(Date.now());
-      setConversations([fallback]);
-      setActiveConversationId(fallback.id);
-      return;
-    }
+      if (activeConversationId === conversationId) {
+        setActiveConversationId(nextConversations[0].id);
+      }
 
-    setConversations(remaining);
-    if (activeConversationId === id) {
-      setActiveConversationId(remaining[0].id);
-    }
+      return nextConversations;
+    });
   }
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     const trimmed = draft.trim();
 
-    if (!trimmed || isLoading || !activeConversation) {
+    if (!trimmed || isLoading) {
       return;
     }
 
-    const userMessage: Message = {
-      id: Date.now(),
-      role: "user",
-      content: trimmed,
-    };
+    let resolvedConversationId = activeConversationId ?? conversations[0]?.id;
+    if (!resolvedConversationId) {
+      const fallbackConversation = createConversation("New Chat", []);
+      setConversations([fallbackConversation]);
+      setActiveConversationId(fallbackConversation.id);
+      resolvedConversationId = fallbackConversation.id;
+    }
 
-    const title = activeConversation.title === "New Chat" && !activeConversation.messages.some((message) => message.role === "user")
-      ? buildConversationTitle(trimmed)
-      : activeConversation.title;
-
-    const conversationWithUserMessage: Conversation = {
-      ...activeConversation,
-      title,
-      messages: [...activeConversation.messages, userMessage],
-    };
+    const userMessage = createMessage(trimmed, "user");
 
     setConversations((current) =>
-      current.map((conversation) =>
-        conversation.id === activeConversation.id ? conversationWithUserMessage : conversation
-      )
+      current.map((conversation) => {
+        if (conversation.id !== resolvedConversationId) {
+          return conversation;
+        }
+
+        const hasUserMessages = conversation.messages.some((message) => message.role === "user");
+        return {
+          ...conversation,
+          title: hasUserMessages ? conversation.title : createTitleFromMessage(trimmed),
+          messages: [...conversation.messages, userMessage],
+        };
+      })
     );
+
     setDraft("");
     setError("");
     setIsLoading(true);
@@ -199,21 +220,18 @@ export default function ChatPage() {
         throw new Error(data.error || "Unable to get a response right now.");
       }
 
-      const assistantMessage: Message = {
-        id: Date.now() + 1,
-        role: "assistant",
-        content: data.reply || "I’m here when you need me.",
-      };
+      const assistantMessage = createMessage(data.reply || "I’m here when you need me.", "assistant");
 
       setConversations((current) =>
-        current.map((conversation) =>
-          conversation.id === activeConversation.id
-            ? {
-                ...conversation,
-                messages: [...conversation.messages, assistantMessage],
-              }
-            : conversation
-        )
+        current.map((conversation) => {
+          if (conversation.id !== resolvedConversationId) {
+            return conversation;
+          }
+          return {
+            ...conversation,
+            messages: [...conversation.messages, assistantMessage],
+          };
+        })
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
@@ -229,66 +247,91 @@ export default function ChatPage() {
 
   return (
     <div className="min-h-screen bg-black text-white">
-      <div className="mx-auto flex min-h-screen max-w-7xl flex-col px-4 py-4 sm:px-6 lg:flex-row lg:px-6 lg:py-6">
-        <aside className="w-full rounded-[1.75rem] border border-white/10 bg-zinc-950/80 p-4 backdrop-blur-xl lg:mr-4 lg:w-80 lg:p-5">
-          <div className="flex items-center justify-between">
-            <Link href="/" className="text-sm font-semibold uppercase tracking-[0.35em] text-white transition hover:opacity-80">
-              Nexio AI
-            </Link>
-            <Link href="/image" className="text-sm text-zinc-400 transition hover:text-white">
-              Image
-            </Link>
+      <div className="mx-auto flex min-h-screen max-w-7xl flex-col px-3 py-3 sm:px-4 lg:flex-row lg:px-6 lg:py-6">
+        <aside className="fixed inset-x-0 top-0 z-30 flex h-[72px] items-center justify-between border-b border-white/10 bg-black/95 px-4 backdrop-blur-xl sm:px-6 lg:static lg:h-auto lg:w-[280px] lg:flex-col lg:justify-start lg:rounded-[1.75rem] lg:border lg:bg-zinc-950/80 lg:p-4 lg:pr-3">
+          <div className="flex w-full items-center justify-between lg:flex-col lg:items-stretch lg:gap-4">
+            <div className="flex items-center justify-between lg:w-full">
+              <Link href="/" className="text-sm font-semibold uppercase tracking-[0.35em] text-white transition hover:opacity-80">
+                Nexio AI
+              </Link>
+              <Link href="/image" className="text-sm text-zinc-400 transition hover:text-white lg:hidden">
+                Image
+              </Link>
+            </div>
+
+            <button
+              type="button"
+              onClick={createNewChat}
+              className="rounded-full border border-white/15 bg-white px-4 py-2.5 text-sm font-medium text-black transition hover:bg-zinc-100"
+            >
+              New Chat
+            </button>
           </div>
 
-          <button
-            type="button"
-            onClick={handleNewChat}
-            className="mt-6 flex w-full items-center justify-center rounded-full border border-white/15 bg-white px-4 py-3 text-sm font-medium text-black transition hover:bg-zinc-100"
-          >
-            New Chat
-          </button>
+          <div className="hidden lg:block lg:w-full lg:pt-4">
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+              <div className="flex items-center justify-between">
+                <p className="text-xs uppercase tracking-[0.3em] text-zinc-500">Chats</p>
+              </div>
+              <div className="mt-4 max-h-[44vh] space-y-2 overflow-y-auto">
+                {conversations.map((conversation) => {
+                  const isActive = conversation.id === activeConversationId;
 
-          <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-4">
-            <p className="text-xs uppercase tracking-[0.3em] text-zinc-500">History</p>
-            <div className="mt-4 space-y-2">
-              {conversations.length > 0 ? (
-                conversations.map((conversation) => (
-                  <button
-                    key={conversation.id}
-                    type="button"
-                    onClick={() => handleSelectConversation(conversation.id)}
-                    className={`flex w-full items-center justify-between rounded-xl border px-3 py-2 text-left text-sm transition ${
-                      activeConversationId === conversation.id
-                        ? "border-white/20 bg-white/10 text-white"
-                        : "border-white/10 bg-black/40 text-zinc-300 hover:border-white/20 hover:bg-white/5"
-                    }`}
-                  >
-                    <span className="truncate pr-2">{conversation.title}</span>
-                    <span
-                      role="button"
-                      tabIndex={0}
-                      onClick={(event) => handleDeleteConversation(conversation.id, event)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter" || event.key === " ") {
-                          event.preventDefault();
-                          handleDeleteConversation(conversation.id, event as unknown as MouseEvent<HTMLButtonElement>);
-                        }
-                      }}
-                      className="shrink-0 text-zinc-500 transition hover:text-white"
-                      aria-label={`Delete ${conversation.title}`}
+                  return (
+                    <div
+                      key={conversation.id}
+                      className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 transition ${
+                        isActive
+                          ? "border-white/20 bg-white/10"
+                          : "border-white/10 bg-black/40 hover:border-white/20 hover:bg-white/5"
+                      }`}
                     >
-                      ×
-                    </span>
-                  </button>
-                ))
-              ) : (
-                <p className="text-sm text-zinc-500">Your recent conversations will appear here.</p>
-              )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveConversationId(conversation.id);
+                          setDraft("");
+                          setError("");
+                        }}
+                        className="flex-1 text-left"
+                      >
+                        <div className="truncate text-sm font-medium text-white">{conversation.title}</div>
+                        <div className="mt-1 text-xs text-zinc-500">
+                          {new Date(conversation.createdAt).toLocaleDateString(undefined, {
+                            month: "short",
+                            day: "numeric",
+                          })}
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          deleteConversation(conversation.id);
+                        }}
+                        className="rounded-full border border-white/10 p-1.5 text-xs text-zinc-400 transition hover:border-white/20 hover:text-white"
+                        aria-label={`Delete ${conversation.title}`}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
+          </div>
+
+          <div className="hidden lg:flex lg:w-full lg:items-center lg:justify-between lg:pt-6">
+            <button
+              type="button"
+              className="rounded-full border border-white/15 px-4 py-2 text-sm text-zinc-300 transition hover:border-white/30 hover:text-white"
+            >
+              Settings
+            </button>
           </div>
         </aside>
 
-        <section className="mt-4 flex min-h-[70vh] flex-1 flex-col overflow-hidden rounded-[1.75rem] border border-white/10 bg-zinc-950/70 backdrop-blur-xl lg:mt-0">
+        <section className="mt-[84px] flex min-h-[70vh] flex-1 flex-col overflow-hidden rounded-[1.75rem] border border-white/10 bg-zinc-950/70 backdrop-blur-xl lg:mt-0 lg:ml-4">
           <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-6">
             <div className="mx-auto flex max-w-3xl flex-col gap-4">
               {messages.map((message) => (
