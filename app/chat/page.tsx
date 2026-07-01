@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
+import { listenToAuthState } from "@/lib/firebase";
 
 type Message = {
   id: number;
@@ -55,9 +57,12 @@ function createTitleFromMessage(content: string) {
 }
 
 export default function ChatPage() {
+  const router = useRouter();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
+  const [authReady, setAuthReady] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [draft, setDraft] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -74,6 +79,48 @@ export default function ChatPage() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages, isLoading]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function syncAuth() {
+      try {
+        const unsubscribe = await listenToAuthState((user) => {
+          if (cancelled) {
+            return;
+          }
+
+          setIsAuthenticated(Boolean(user));
+          setAuthReady(true);
+        });
+
+        if (cancelled) {
+          unsubscribe?.();
+        }
+      } catch {
+        if (!cancelled) {
+          setAuthReady(true);
+          setIsAuthenticated(false);
+        }
+      }
+    }
+
+    syncAuth();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!authReady) {
+      return;
+    }
+
+    if (!isAuthenticated) {
+      router.replace("/login");
+    }
+  }, [authReady, isAuthenticated, router]);
 
   useEffect(() => {
     if (!copiedMessageId) {
