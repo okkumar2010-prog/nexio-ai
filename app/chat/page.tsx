@@ -309,28 +309,28 @@ export default function ChatPage() {
             <button
               type="button"
               onClick={createNewChat}
-              className="rounded-full border border-white/15 bg-white px-4 py-2.5 text-sm font-medium text-black transition hover:bg-zinc-100"
+              className="rounded-full border border-white/15 bg-white px-4 py-2.5 text-sm font-medium text-black transition-all duration-300 hover:-translate-y-0.5 hover:bg-zinc-100 hover:shadow-[0_0_24px_rgba(255,255,255,0.18)]"
             >
               New Chat
             </button>
           </div>
 
           <div className="hidden lg:block lg:w-full lg:pt-4">
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+            <div className="rounded-[1.35rem] border border-white/10 bg-white/[0.04] p-4 shadow-[0_0_40px_rgba(255,255,255,0.03)]">
               <div className="flex items-center justify-between">
-                <p className="text-xs uppercase tracking-[0.3em] text-zinc-500">Chats</p>
+                <p className="text-[0.68rem] font-medium uppercase tracking-[0.32em] text-zinc-500">Chats</p>
               </div>
-              <div className="mt-4 max-h-[44vh] space-y-2 overflow-y-auto">
+              <div className="mt-4 max-h-[44vh] space-y-2 overflow-y-auto pr-1">
                 {conversations.map((conversation) => {
                   const isActive = conversation.id === activeConversationId;
 
                   return (
                     <div
                       key={conversation.id}
-                      className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 transition ${
+                      className={`flex items-center gap-2 rounded-[1rem] border px-3 py-2.5 transition-all duration-300 ${
                         isActive
-                          ? "border-white/20 bg-white/10"
-                          : "border-white/10 bg-black/40 hover:border-white/20 hover:bg-white/5"
+                          ? "border-white/20 bg-white/10 shadow-[0_0_20px_rgba(255,255,255,0.08)]"
+                          : "border-white/10 bg-black/40 hover:-translate-y-0.5 hover:border-white/20 hover:bg-white/5"
                       }`}
                     >
                       <button
@@ -343,7 +343,7 @@ export default function ChatPage() {
                         className="flex-1 text-left"
                       >
                         <div className="truncate text-sm font-medium text-white">{conversation.title}</div>
-                        <div className="mt-1 text-xs text-zinc-500">
+                        <div className="mt-1 text-[11px] text-zinc-500">
                           {new Date(conversation.createdAt).toLocaleDateString(undefined, {
                             month: "short",
                             day: "numeric",
@@ -356,7 +356,7 @@ export default function ChatPage() {
                           event.stopPropagation();
                           deleteConversation(conversation.id);
                         }}
-                        className="rounded-full border border-white/10 p-1.5 text-xs text-zinc-400 transition hover:border-white/20 hover:text-white"
+                        className="rounded-full border border-white/10 p-1.5 text-xs text-zinc-400 transition-all duration-200 hover:border-white/20 hover:bg-white/10 hover:text-white"
                         aria-label={`Delete ${conversation.title}`}
                       >
                         ×
@@ -378,22 +378,22 @@ export default function ChatPage() {
           </div>
         </aside>
 
-        <section className="mt-[84px] flex min-h-[70vh] flex-1 flex-col overflow-hidden rounded-[1.75rem] border border-white/10 bg-zinc-950/70 backdrop-blur-xl lg:mt-0 lg:ml-4">
-          <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-6">
+        <section className="mt-[84px] flex min-h-[70vh] flex-1 flex-col overflow-hidden rounded-[1.75rem] border border-white/10 bg-zinc-950/70 backdrop-blur-xl shadow-[0_0_70px_rgba(255,255,255,0.04)] lg:mt-0 lg:ml-4">
+          <div className="flex-1 overflow-y-auto px-3 py-3 sm:px-6 sm:py-6">
             <div className="mx-auto flex max-w-3xl flex-col gap-4">
               {messages.map((message) => (
                 <div
                   key={message.id}
                   className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
                 >
-                  <div className={`flex max-w-[90%] items-start gap-3 ${message.role === "user" ? "flex-row-reverse" : "flex-row"}`}>
-                    <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border text-sm font-semibold ${message.role === "user" ? "border-white/15 bg-white text-black" : "border-white/10 bg-white/10 text-white"}`}>
+                  <div className={`flex max-w-[92%] items-start gap-3 ${message.role === "user" ? "flex-row-reverse" : "flex-row"}`}>
+                    <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border text-sm font-semibold transition-transform duration-200 ${message.role === "user" ? "border-white/15 bg-white text-black shadow-[0_0_20px_rgba(255,255,255,0.18)]" : "border-white/10 bg-white/10 text-white"}`}>
                       {message.role === "user" ? "U" : "N"}
                     </div>
                     <div
-                      className={`rounded-2xl px-4 py-3 text-sm leading-7 shadow-sm sm:text-[15px] ${
+                      className={`rounded-[1.2rem] px-4 py-3 text-sm leading-7 shadow-sm transition-all duration-300 sm:text-[15px] ${
                         message.role === "user"
-                          ? "bg-white text-black"
+                          ? "bg-white text-black shadow-[0_0_30px_rgba(255,255,255,0.12)]"
                           : "border border-white/10 bg-white/5 text-zinc-200"
                       }`}
                     >
@@ -434,7 +434,7 @@ export default function ChatPage() {
                           <button
                             type="button"
                             onClick={() => copyMessage(message.content, message.id)}
-                            className="rounded-full border border-white/10 px-3 py-1.5 text-[11px] uppercase tracking-[0.25em] text-zinc-400 transition hover:border-white/20 hover:text-white"
+                            className="rounded-full border border-white/10 px-3 py-1.5 text-[11px] uppercase tracking-[0.25em] text-zinc-400 transition-all duration-200 hover:border-white/20 hover:bg-white/10 hover:text-white"
                           >
                             {copiedMessageId === message.id ? "Copied" : "Copy"}
                           </button>
@@ -453,11 +453,11 @@ export default function ChatPage() {
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/10 text-sm font-semibold text-white">
                       N
                     </div>
-                    <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-zinc-300">
+                    <div className="rounded-[1.2rem] border border-white/10 bg-white/5 px-4 py-3 text-sm text-zinc-300 shadow-[0_0_24px_rgba(255,255,255,0.04)]">
                       <div className="flex items-center gap-2">
-                        <span className="h-2.5 w-2.5 animate-bounce rounded-full bg-white [animation-delay:0ms]" />
-                        <span className="h-2.5 w-2.5 animate-bounce rounded-full bg-white [animation-delay:150ms]" />
-                        <span className="h-2.5 w-2.5 animate-bounce rounded-full bg-white [animation-delay:300ms]" />
+                        <span className="h-2.5 w-2.5 animate-[bounce_1s_infinite] rounded-full bg-white [animation-delay:0ms]" />
+                        <span className="h-2.5 w-2.5 animate-[bounce_1s_infinite] rounded-full bg-white [animation-delay:160ms]" />
+                        <span className="h-2.5 w-2.5 animate-[bounce_1s_infinite] rounded-full bg-white [animation-delay:320ms]" />
                       </div>
                     </div>
                   </div>
@@ -473,8 +473,8 @@ export default function ChatPage() {
             </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="border-t border-white/10 bg-black/40 p-4 sm:p-5">
-            <div className="mx-auto flex max-w-3xl items-end gap-3 rounded-full border border-white/10 bg-white/5 px-3 py-3 backdrop-blur-sm">
+          <form onSubmit={handleSubmit} className="border-t border-white/10 bg-black/40 p-3 sm:p-5">
+            <div className="mx-auto flex max-w-3xl items-end gap-3 rounded-full border border-white/10 bg-white/5 px-3 py-3 backdrop-blur-sm shadow-[0_0_28px_rgba(255,255,255,0.04)]">
               <textarea
                 value={draft}
                 onChange={(event) => setDraft(event.target.value)}
@@ -491,7 +491,7 @@ export default function ChatPage() {
               <button
                 type="submit"
                 disabled={isLoading || !draft.trim()}
-                className="rounded-full bg-white px-4 py-2 text-sm font-medium text-black transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-full bg-white px-4 py-2 text-sm font-medium text-black transition-all duration-300 hover:-translate-y-0.5 hover:bg-zinc-100 hover:shadow-[0_0_20px_rgba(255,255,255,0.16)] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {isLoading ? "Thinking" : "Send"}
               </button>
